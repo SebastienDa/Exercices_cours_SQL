@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exercices SQL - AdventureWorks</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #f8fafc; color: #334155; }
+        .sql-code { @apply font-mono text-sm bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200; }
+        .chapter-content { transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out; }
+        .progress-bar-container { transition: width 0.5s ease-out; }
+        
+        /* Custom scrollbar for editors */
+        textarea::-webkit-scrollbar { width: 8px; }
+        textarea::-webkit-scrollbar-track { background: #1e293b; }
+        textarea::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        textarea::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Sticky Header with Progress -->
+    <header class="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
+        <div class="max-w-4xl mx-auto px-4 py-4">
+            <div class="flex justify-between items-center mb-2">
+                <h1 class="text-xl font-bold text-slate-900 tracking-tight">
+                    <i data-lucide="database" class="inline-block w-6 h-6 mr-2 text-blue-600"></i>
+                    Exercices SQL <span class="text-slate-500 font-normal text-sm ml-2 hidden sm:inline">Base AdventureWorks</span>
+                </h1>
+                <div class="text-sm font-medium text-slate-600 flex flex-col items-end">
+                    <span>Avancement : <span id="progress-text" class="text-blue-700 font-bold">0%</span></span>
+                    <span id="save-indicator" class="text-[10px] text-green-600 font-normal opacity-0 transition-opacity duration-500">Sauvegardé</span>
+                </div>
+            </div>
+            <!-- Progress Bar -->
+            <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full progress-bar-container" style="width: 0%"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-4xl mx-auto px-4 py-8 w-full" id="app-container">
+        <!-- Content will be injected here via JavaScript -->
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 py-8 mt-auto">
+        <div class="max-w-4xl mx-auto px-4 text-center">
+            <p class="text-sm mb-4">Support d'exercices techniques - SQL Server / PostgreSQL</p>
+            <div class="space-x-4">
+                 <button onclick="exportData()" class="text-xs text-slate-500 hover:text-white transition-colors underline">
+                    Exporter mes réponses (JSON)
+                </button>
+                <button onclick="resetProgress()" class="text-xs text-red-400 hover:text-red-300 transition-colors underline">
+                    Réinitialiser tout
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script>
+        // Data Structure
+        const curriculum = [
+            {
+                title: "Exercices SELECT et SELECT DISTINCT",
+                intro: "Ecrivez les requêtes demandées à l'aide des commandes SELECT et SELECT DISTINCT.",
+                questions: [
+                    "Via la table <span class='sql-code'>humanresources.department</span>, trouvez le nombre de départements présents dans l'entreprise.",
+                    "Via cette même table, determinez combien de groupes de départements différents sont présents.",
+                    "Affichez un tableau à une colonne avec les noms de catégories de produits présents dans la table <span class='sql-code'>production.productcategory</span>.",
+                    "Affichez un tableau avec les différentes couleurs proposées par la société pour ses produits, via la table <span class='sql-code'>production.product</span>.",
+                    "Affichez les combinaisons uniques d'ID de sous-catégories avec les couleurs de produits, via la table <span class='sql-code'>production.product</span>."
+                ]
+            },
+            {
+                title: "Exercices Filtre WHERE",
+                intro: "Réalisez les requêtes SQL correspondantes à l'énoncé.",
+                questions: [
+                    "<strong>Contexte :</strong> On souhaite prévenir les clients d'une boutique spécifique qu'elle va changer d'adresse.<br>Via la table <span class='sql-code'>Sales.Customer</span>, isolez les clients reliés au <code>store id 990</code>.",
+                    "<strong>Contexte :</strong> On souhaite vérifier les informations d'un produit spécifique.<br>Via la table <span class='sql-code'>Production.Product</span>, isolez les informations du produit ayant pour nom <code>'Adjustable Race'</code>.",
+                    "<strong>Contexte :</strong> On souhaite trouver les produits dont le prix d'achat est égal au prix de vente.<br>Écrivez une requête pour sélectionner les produits de <span class='sql-code'>production.product</span> dont le <code>standardcost</code> est égal au <code>listprice</code>.",
+                    "<strong>Contexte :</strong> On souhaite vérifier que le stock de sécurité est bien toujours supérieur au stock limite de commande.<br>Écrivez une requête pour sélectionner les produits de <span class='sql-code'>production.product</span> dont le <code>safetystocklevel</code> est inférieur au <code>reorderpoint</code>.",
+                    "<strong>Contexte :</strong> On souhaite isoler les zones de ventes en dehors des USA.<br>Écrivez une requête pour sélectionner les zones de vente de la table <span class='sql-code'>Sales.Salesterritory</span> dont le <code>countryregioncode</code> n'est pas égal à <code>'US'</code>.",
+                    "<strong>Contexte :</strong> On souhaite vérifier que tous les produits ont bien un temps de manufacture indiqué.<br>Écrivez une requête pour sélectionner les produits de <span class='sql-code'>production.product</span> dont le <code>daystomanufacture</code> est vide (NULL ou 0 selon contexte).",
+                    "<strong>Contexte :</strong> On souhaite voir si le poids des produits est parfois indiqué.<br>Écrivez une requête pour sélectionner les produits de la table <span class='sql-code'>production.product</span> dont le <code>weight</code> n'est pas vide."
+                ]
+            },
+            {
+                title: "Exercices Filtres Combinés",
+                intro: "Réalisez les requêtes SQL par rapport à la problématique indiquée.",
+                questions: [
+                    "Trouver tous les <code>'Design Engineer'</code> embauchés après le <strong>1er janvier 2005</strong>, via la table <span class='sql-code'>humanresources.employee</span>.",
+                    "Trouvez les hommes (via la colonne <code>gender</code>) étant <code>'Tool Designer'</code> ou <code>'Design Engineer'</code>, via la table <span class='sql-code'>humanresources.employee</span>."
+                ]
+            },
+            {
+                title: "Exercices Filtres Avancés",
+                intro: "Utilisation des opérateurs logiques complexes.",
+                questions: [
+                    "Trouvez les clients ayant pour ID de territoire 1, 2 ou 3, via la table <span class='sql-code'>Sales.Customer</span>.",
+                    "Trouvez les clients ayant pour ID de territoire une valeur qui n'est <strong>pas</strong> entre 1 et 5 via la table <span class='sql-code'>Sales.Customer</span>.",
+                    "Trouvez les clients ayant pour ID de territoire une valeur qui n'est <strong>pas</strong> entre 1 et 5 et dont le <code>store id</code> est 942, 1022 ou 1340 via la table <span class='sql-code'>Sales.Customer</span>."
+                ]
+            },
+            {
+                title: "Exercices Filtres LIKE",
+                intro: "Manipulation de chaînes de caractères partielles.",
+                questions: [
+                    "Écrivez une requête pour trouver tous les employés de la table <span class='sql-code'>person.person</span> dont le prénom commence par <code>'J'</code>.",
+                    "Écrivez une requête pour trouver tous les employés de la table <span class='sql-code'>person.person</span> dont le deuxième caractère du prénom est <code>'a'</code>.",
+                    "Écrivez une requête pour trouver tous les employés de la table <span class='sql-code'>person.person</span> dont le deuxième caractère du prénom est <code>'a'</code> et qui se terminent par <code>'n'</code>.",
+                    "Écrivez une requête pour trouver tous les employés de la table <span class='sql-code'>person.person</span> dont le prénom contient <code>'jo'</code>, indépendamment de la casse."
+                ]
+            },
+            {
+                title: "Exercices SORT BY et LIMIT",
+                intro: "Tri et pagination des résultats.",
+                questions: [
+                    "Sélectionnez les 10 premiers employés embauchés en utilisant la table <span class='sql-code'>humanresources.employee</span>.",
+                    "Sélectionnez les 5 derniers employés embauchés en utilisant la table <span class='sql-code'>humanresources.employee</span>.",
+                    "Sélectionnez les 100 employés, classés par <code>jobtitle</code>, puis par date d'arrivée, avec la table <span class='sql-code'>humanresources.employee</span>.",
+                    "Sélectionnez les 10 employés, classés par <code>jobtitle</code>, puis par date d'arrivée, avec la table <span class='sql-code'>humanresources.employee</span>, et isoler les lignes 10 à 20 (Offset)."
+                ]
+            },
+            {
+                title: "Exercices GROUP BY",
+                intro: "Agrégations et regroupements.",
+                questions: [
+                    "Combien de produits y a-t-il dans chaque sous-catégorie ?",
+                    "Comptez le nombre de produits pour chaque sous-catégorie dans la table <span class='sql-code'>Production.Product</span>.",
+                    "Quel est le poids minimum, maximum et moyen des produits pour chaque sous-catégorie ?",
+                    "Trouver le poids (<code>weight</code>) minimum, maximum et moyen des produits pour chaque catégorie dans la table <span class='sql-code'>Production.Product</span>.",
+                    "Combien de produits y a-t-il pour chaque combinaison de modèle (<code>productmodelid</code>) et de couleur (<code>color</code>) ?",
+                    "Quelles sous-catégories (<code>ProductsubCategoryID</code>) de produits ont plus de 10 produits (<code>ProductID</code>) ? (Utilisation de HAVING)",
+                    "Quelles sous-catégories (<code>ProductsubCategoryID</code>) de produits ont plus de 10 produits dont le prix (<code>listprice</code>) est supérieur à 100$ ?"
+                ]
+            },
+            {
+                title: "Exercices INNER JOIN",
+                intro: "Jointures internes.",
+                questions: [
+                    "Consultez les tables <span class='sql-code'>sales.customer</span> et <span class='sql-code'>sales.store</span> et identifiez la clé de jointure.<br>1. Utilisez un <code>INNER JOIN</code> pour inclure uniquement les magasins ayant des clients.<br>2. Choisir la colonne <code>name</code> de <span class='sql-code'>sales.store</span> et la renommer en <code>storeName</code>.<br>3. Compter le nombre de clients (<code>customerid</code>) pour chaque magasin via <code>GROUP BY</code> et renommer cette colonne 'NumClients'.<br>4. Triez par NumClients décroissant.<br><em>Quelle requête obtenez-vous ?</em>"
+                ]
+            },
+            {
+                title: "LEFT/RIGHT JOIN et OUTER JOIN",
+                intro: "Calcul des ventes via offre spéciale.",
+                questions: [
+                    "<strong>Objectif :</strong> Calculer le nombre de ventes réalisées via une offre spéciale (<code>offerid != '1'</code>), pour chaque produit.<br><ul class='list-disc pl-5 mt-2 space-y-1'><li>Analysez <span class='sql-code'>Sales.Salesorderdetail</span> et <span class='sql-code'>production.product</span> pour trouver la clé.</li><li>Utilisez une jointure externe pour inclure <strong>tous</strong> les produits.</li><li>Renommez la colonne <code>name</code> en <code>productName</code>.</li><li>Sommez les quantités vendues (<code>orderqty</code>), remplacez NULL par 0 (<code>COALESCE</code>).</li><li>Sommez la quantité vendue <strong>uniquement</strong> si <code>specialofferid</code> n'est pas égal à 1 (Utilisez <code>CASE</code>).</li><li>Triez par quantité vendue décroissante et limitez à 100 résultats.</li></ul>"
+                ]
+            },
+            {
+                title: "Création de base de données",
+                intro: "DDL - Data Definition Language.",
+                questions: [
+                    "<strong>Mission :</strong> Créer la table 'Client' pour la BDD 'My Company'.<br>Champs requis :<br>- <code>client_id</code> (Clé unique/primaire)<br>- <code>nom_client</code> (Non vide)<br>- <code>email_client</code> (Doit contenir '@')<br>- <code>carte_fidelite</code> (Booléen, défaut à False)<br><br>Identifiez les types, les contraintes et construisez la requête <code>CREATE TABLE</code>."
+                ]
+            },
+            {
+                title: "Insertion de données",
+                intro: "DML - Insertion.",
+                questions: [
+                    "À partir d'un fichier CSV (théorique), créez la requête permettant l’insertion des commandes dans la table des commandes.<br>Note : La clé primaire est auto-générée (ne pas l'inclure).<br>Utilisez la clause <code>RETURNING</code> pour vérifier le résultat."
+                ]
+            },
+            {
+                title: "Modification et Suppression",
+                intro: "UPDATE et DELETE.",
+                questions: [
+                    "1. Créer une nouvelle colonne « Premium » dans la table « Produit ». Si prix > 200€, valeur = 'True', sinon 'False' (Défaut).",
+                    "2. Une erreur s’est glissée dans les commandes. Supprimez toutes les références à la commande « 2001 » dans la table « commandes ».",
+                    "3. Créer une nouvelle colonne « VIP » dans la table « Client ». Si achats cumulés > 1000€, VIP = True, sinon False."
+                ]
+            },
+            {
+                title: "Exercices String / Regex",
+                intro: "Manipulation textuelle avancée.",
+                questions: [
+                    "Concaténation : Formez la phrase « Le produit #Name# correspond à la référence modèle #productNumber# » via <span class='sql-code'>production.product</span>.",
+                    "Nettoyage : Dans la colonne Name, remplacez « Helmet » par « bike helmet » et « Sports Shorts » par « bike Short ». Filtrez ensuite via Regex sur ces produits modifiés.",
+                    "Validation Email : Écrivez l'expression régulière pour valider :<br>- Prénom (caractères uniquement)<br>- Séparateur '.'<br>- Nom (caractères uniquement)<br>- Domaine '@email.com'<br>Filtrez les emails ne respectant <strong>pas</strong> ce pattern."
+                ]
+            },
+            {
+                title: "Fonctions Numériques",
+                intro: "Mathématiques et Randomisation.",
+                questions: [
+                    "Faites en sorte de ne sélectionner qu’environ 20% des produits de manière aléatoire.<br>Affichez <code>name</code> et <code>priceList</code> (arrondi à 1 décimale)."
+                ]
+            },
+            {
+                title: "Fonctions de Dates",
+                intro: "Manipulation temporelle.",
+                questions: [
+                    "Table <span class='sql-code'>salesorderheader</span> :<br>1) Créez 2 colonnes (Année, Mois).<br>2) Group By sur ces 2 colonnes pour avoir le count et le CA (<code>subtotal</code>).<br>3) Tri chronologique.",
+                    "Espace client : Pour chaque commande, générez la phrase : « Cet achat a été réalisé le #nomJours# #jours# #nomMois# #Année# ».",
+                    "Calcul de durée : À l’aide des colonnes <code>sellstartdate</code> et <code>sellenddate</code> de <span class='sql-code'>production.product</span>, calculez le temps durant lequel les produits ont été vendus."
+                ]
+            },
+            {
+                title: "Sous-requêtes",
+                intro: "Requêtes imbriquées.",
+                questions: [
+                    "Trouver tous les produits (<span class='sql-code'>production.product</span>) vendus en quantité > 15 lors d'une seule transaction.",
+                    "Trouver les produits ayant un chiffre d'affaires total (<code>OrderQty * UnitPrice</code>) supérieur au CA moyen de tous les produits.",
+                    "Trouver tous les produits dont le coût standard est supérieur au prix moyen auquel ils ont été vendus."
+                ]
+            },
+            {
+                title: "Les Vues (Views)",
+                intro: "Objets virtuels.",
+                questions: [
+                    "Créez une vue affichant uniquement : Nom, Couleur, Prix Standard, Taille.",
+                    "Modifiez/Recréez la vue pour ajouter la sous-catégorie du produit (nécessite jointure entre Product et ProductSubcategory)."
+                ]
+            },
+            {
+                title: "Procédures et Triggers",
+                intro: "Automatisation base de données.",
+                questions: [
+                    "1. Créez la table <code>historique_prix</code> (id, produit_id, ancien_prix, nouveau_prix, date_modif).",
+                    "2. Créez un déclencheur (trigger) exécuté à chaque mise à jour du prix dans la table produit pour alimenter l'historique.",
+                    "3. Testez le déclencheur en modifiant un prix et en vérifiant la table historique."
+                ]
+            }
+        ];
+
+        const appContainer = document.getElementById('app-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const saveIndicator = document.getElementById('save-indicator');
+        
+        // Load state from local storage. 
+        // New structure: { "q-0": { answer: "SELECT...", completed: true }, ... }
+        let savedState = JSON.parse(localStorage.getItem('sqlAdventureWorksData')) || {};
+
+        // Migration helper: if old structure (array) is detected, convert it
+        if (Array.isArray(savedState)) {
+            const tempState = {};
+            savedState.forEach(id => {
+                tempState[id] = { answer: "", completed: true };
+            });
+            savedState = tempState;
+        }
+
+        function renderApp() {
+            appContainer.innerHTML = '';
+            let globalQuestionIndex = 0;
+
+            curriculum.forEach((chapter, chapterIndex) => {
+                // Create Accordion Item
+                const section = document.createElement('div');
+                section.className = "mb-4 bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden";
+
+                // Header
+                const header = document.createElement('button');
+                header.className = "w-full flex justify-between items-center px-6 py-4 bg-slate-50 hover:bg-slate-100 transition-colors focus:outline-none";
+                header.onclick = () => toggleChapter(chapterIndex);
+                
+                header.innerHTML = `
+                    <div class="text-left">
+                        <h2 class="text-lg font-semibold text-slate-800">${chapter.title}</h2>
+                        <p class="text-xs text-slate-500 mt-1">${chapter.intro || ''}</p>
+                    </div>
+                    <i id="icon-${chapterIndex}" data-lucide="chevron-down" class="w-5 h-5 text-slate-400 transition-transform duration-300"></i>
+                `;
+
+                // Content Body
+                const content = document.createElement('div');
+                content.id = `content-${chapterIndex}`;
+                content.className = "hidden"; // Default collapsed
+
+                const list = document.createElement('div');
+                list.className = "px-6 py-4 space-y-6";
+
+                chapter.questions.forEach((q) => {
+                    const qId = `q-${globalQuestionIndex}`;
+                    const data = savedState[qId] || { answer: "", completed: false };
+                    
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = "border-b border-slate-100 last:border-0 pb-6";
+                    
+                    itemDiv.innerHTML = `
+                        <div class="flex justify-between items-start">
+                             <div class="text-sm text-slate-700 font-medium mb-2 leading-relaxed flex-1 pr-4">${q}</div>
+                             <div id="status-${qId}" class="${data.completed ? 'text-green-500' : 'text-slate-300'} flex-shrink-0 pt-0.5">
+                                <i data-lucide="check-circle" class="w-5 h-5 fill-current bg-white rounded-full"></i>
+                             </div>
+                        </div>
+                        
+                        <button onclick="toggleEditor('${qId}')" class="text-xs text-blue-600 hover:text-blue-800 flex items-center mt-2 font-medium focus:outline-none">
+                            <i data-lucide="code" class="w-4 h-4 mr-1"></i> 
+                            <span id="btn-text-${qId}">${data.answer ? 'Voir ma requête' : 'Ouvrir l\'éditeur SQL'}</span>
+                        </button>
+
+                        <div id="editor-${qId}" class="hidden mt-3 bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-inner">
+                            <label class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Votre Requête SQL</label>
+                            <textarea 
+                                id="input-${qId}"
+                                class="w-full h-32 bg-slate-800 text-green-400 font-mono text-sm p-4 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3 leading-relaxed"
+                                placeholder="SELECT * FROM table..."
+                                spellcheck="false"
+                                oninput="handleInput('${qId}')"
+                            >${data.answer}</textarea>
+                            
+                            <div class="flex items-center justify-between mt-2">
+                                <div class="flex items-center">
+                                    <label class="inline-flex items-center cursor-pointer select-none group">
+                                        <div class="relative">
+                                            <input type="checkbox" id="check-${qId}" class="peer sr-only" 
+                                                onchange="toggleCompletion('${qId}')" ${data.completed ? 'checked' : ''}>
+                                            <div class="w-10 h-6 bg-slate-300 rounded-full peer peer-focus:ring-2 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                        </div>
+                                        <span class="ml-3 text-sm font-medium text-slate-600 group-hover:text-slate-900 transition-colors">Exercice terminé</span>
+                                    </label>
+                                </div>
+                                <span class="text-xs text-slate-400 italic">Sauvegarde auto</span>
+                            </div>
+                        </div>
+                    `;
+                    list.appendChild(itemDiv);
+                    globalQuestionIndex++;
+                });
+
+                content.appendChild(list);
+                section.appendChild(header);
+                section.appendChild(content);
+                appContainer.appendChild(section);
+            });
+            
+            // Re-init icons
+            lucide.createIcons();
+            updateProgress();
+        }
+
+        function toggleChapter(index) {
+            const content = document.getElementById(`content-${index}`);
+            const icon = document.getElementById(`icon-${index}`);
+            
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                content.classList.add('hidden');
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function toggleEditor(id) {
+            const editor = document.getElementById(`editor-${id}`);
+            const btnText = document.getElementById(`btn-text-${id}`);
+            
+            if (editor.classList.contains('hidden')) {
+                editor.classList.remove('hidden');
+                btnText.innerText = 'Masquer l\'éditeur';
+                // Focus the textarea
+                setTimeout(() => document.getElementById(`input-${id}`).focus(), 100);
+            } else {
+                editor.classList.add('hidden');
+                const hasContent = savedState[id] && savedState[id].answer.length > 0;
+                btnText.innerText = hasContent ? 'Voir ma requête' : 'Ouvrir l\'éditeur SQL';
+            }
+        }
+
+        // Debounce function to prevent thrashing storage
+        let timeout;
+        function handleInput(id) {
+            const textarea = document.getElementById(`input-${id}`);
+            const value = textarea.value;
+            
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                updateState(id, { answer: value });
+                showSaveIndicator();
+            }, 500);
+        }
+
+        function toggleCompletion(id) {
+            const checkbox = document.getElementById(`check-${id}`);
+            const isChecked = checkbox.checked;
+            
+            // Visual Update
+            const statusIcon = document.getElementById(`status-${id}`);
+            if(isChecked) {
+                statusIcon.classList.remove('text-slate-300');
+                statusIcon.classList.add('text-green-500');
+            } else {
+                statusIcon.classList.remove('text-green-500');
+                statusIcon.classList.add('text-slate-300');
+            }
+
+            updateState(id, { completed: isChecked });
+            updateProgress();
+            showSaveIndicator();
+        }
+
+        function updateState(id, newData) {
+            if (!savedState[id]) {
+                savedState[id] = { answer: "", completed: false };
+            }
+            savedState[id] = { ...savedState[id], ...newData };
+            localStorage.setItem('sqlAdventureWorksData', JSON.stringify(savedState));
+        }
+
+        function updateProgress() {
+            const totalQuestions = document.querySelectorAll('textarea').length;
+            // Count completed items in state
+            const completedCount = Object.values(savedState).filter(item => item.completed).length;
+            const percentage = totalQuestions === 0 ? 0 : Math.round((completedCount / totalQuestions) * 100);
+
+            progressBar.style.width = `${percentage}%`;
+            progressText.innerText = `${percentage}%`;
+        }
+
+        function showSaveIndicator() {
+            saveIndicator.style.opacity = '1';
+            setTimeout(() => {
+                saveIndicator.style.opacity = '0';
+            }, 2000);
+        }
+
+        function resetProgress() {
+            if(confirm("Attention : Cela effacera toutes vos réponses et votre progression. Continuer ?")) {
+                localStorage.removeItem('sqlAdventureWorksData');
+                savedState = {};
+                renderApp();
+            }
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(savedState, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "mes_exercices_sql.json");
+            document.body.appendChild(downloadAnchorNode); // required for firefox
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        // Initialize
+        renderApp();
+
+    </script>
+</body>
+</html>
